@@ -1,0 +1,19 @@
+{
+  "name": "@liquid-labs/go-search",
+  "version": "0.1.0",
+  "description": "Library for REST-ful requests to an SQL-backed search and paging backend.",
+  "main": "index.js",
+  "scripts": {
+    "test": "cd search && go test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Liquid-Labs/go-search.git"
+  },
+  "author": "Zane Rockenbaugh <zane@liquid-labs.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Liquid-Labs/go-search/issues"
+  },
+  "homepage": "https://github.com/Liquid-Labs/go-search#readme"
+}
