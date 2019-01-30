@@ -63,7 +63,7 @@ func DoList(w http.ResponseWriter, r *http.Request, contextJoins []*JoinData, se
   // note that the auth is handled by the caller because they caller may want to use the token in setting the contextJoins
   var sp *rest.SearchParams
   var restErr rest.RestError
-  if sp, restErr = rest.ExtractSearchParamsFromUrl(w, r); restErr != nil {
+  if sp, restErr = ExtractSearchParamsFromUrl(w, r); restErr != nil {
     // HTTP response is already set
     return
   }
