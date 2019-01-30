@@ -20,6 +20,8 @@ import (
   "log"
   "strconv"
   "strings"
+
+  "github.com/Liquid-Labs/go-rest/rest"
 )
 
 type ResultBuilder func(*sql.Rows) (interface{}, error)
@@ -60,7 +62,7 @@ type PagedQueryParameters struct {
   ResultBuilder        ResultBuilder
   ResourceName         string
   // Query specific parameters
-  SearchParams         *SearchParams
+  SearchParams         *rest.SearchParams
   ContextJoins         []JoinData // Join data based of call context; e.g., '/store/xxx/customers'
   // Plumbing
   Db                   *sql.DB
@@ -79,7 +81,7 @@ type PagedQueryParameters struct {
  * 2) Total count of stuff.
  * 3) Any error.
  */
-func PagedQuery(pqp PagedQueryParameters, contextJoins []*JoinData) (interface{}, int64, RestError) {
+func PagedQuery(pqp PagedQueryParameters, contextJoins []*JoinData) (interface{}, int64, rest.RestError) {
   // First, we construct the query string
   params := make([]interface{}, 0) // build up query parameters
   fromBit := pqp.GeneralFrom // build up 'FROM' clause
@@ -93,7 +95,7 @@ func PagedQuery(pqp PagedQueryParameters, contextJoins []*JoinData) (interface{}
 
   for _, scope := range pqp.SearchParams.Scopes {
     if val, ok := pqp.ScopeJoins[scope]; !ok {
-      return nil, -1, BadRequestError(fmt.Sprintf("Found unknown scope: '%s'.", pqp.SearchParams.Scopes[0]), nil)
+      return nil, -1, rest.BadRequestError(fmt.Sprintf("Found unknown scope: '%s'.", pqp.SearchParams.Scopes[0]), nil)
     } else {
       if val.JoinTest == nil {
         fromBit += val.JoinClause
@@ -115,7 +117,7 @@ func PagedQuery(pqp PagedQueryParameters, contextJoins []*JoinData) (interface{}
     var err error
     whereTerm, params, err = pqp.SearchWhereGenerator(term, params)
     if err != nil {
-      return nil, -1, BadRequestError(fmt.Sprintf("Could not process search term: '%s'.", term), err)
+      return nil, -1, rest.BadRequestError(fmt.Sprintf("Could not process search term: '%s'.", term), err)
     } else {
       whereBit += whereTerm
     }
@@ -131,7 +133,7 @@ func PagedQuery(pqp PagedQueryParameters, contextJoins []*JoinData) (interface{}
   var limitAndOrderBy string = `ORDER BY `
   // expects a default order-by keyed to ""
   if val, ok := pqp.SortMap[pqp.SearchParams.Sort]; !ok {
-    return nil, -1, UnprocessableEntityError(fmt.Sprintf("Bad sort value: '%s'.", pqp.SearchParams.Sort), nil)
+    return nil, -1, rest.UnprocessableEntityError(fmt.Sprintf("Bad sort value: '%s'.", pqp.SearchParams.Sort), nil)
   } else {
     limitAndOrderBy += val
   }
@@ -161,21 +163,21 @@ func PagedQuery(pqp PagedQueryParameters, contextJoins []*JoinData) (interface{}
   txn, err := pqp.Db.BeginTx(ctx, nil)
   if err != nil {
     txn.Rollback()
-    return nil, 0, ServerError(fmt.Sprintf("Could not retrieve " + pqp.ResourceName + "."), err)
+    return nil, 0, rest.ServerError(fmt.Sprintf("Could not retrieve " + pqp.ResourceName + "."), err)
   }
 
   query, err := txn.Prepare(queryStmt)
   if err != nil {
     txn.Rollback()
     log.Printf("Failed to prepare query:\n%s", queryStmt)
-    return nil, 0, ServerError("Could not process " + pqp.ResourceName + " query.", err)
+    return nil, 0, rest.ServerError("Could not process " + pqp.ResourceName + " query.", err)
   }
 
   rows, err := query.Query(params...)
   if err != nil {
     txn.Rollback()
     log.Printf("Failed to execute query:\n%s\nParameters:%v", queryStmt, params)
-    return nil, 0, ServerError("Could not retrieve " + pqp.ResourceName + ".", err)
+    return nil, 0, rest.ServerError("Could not retrieve " + pqp.ResourceName + ".", err)
   }
 
   // This block must come before the 'SELECT FOUND_ROWS()'. My guess is it's
@@ -184,7 +186,7 @@ func PagedQuery(pqp PagedQueryParameters, contextJoins []*JoinData) (interface{}
   if err != nil {
     rows.Close()
     txn.Rollback()
-    return nil, 0, ServerError("Could not retrieve " + pqp.ResourceName + ".", err)
+    return nil, 0, rest.ServerError("Could not retrieve " + pqp.ResourceName + ".", err)
   }
 
   // Notice no 'defer'. If we don't close the row right away, then we get
@@ -194,19 +196,19 @@ func PagedQuery(pqp PagedQueryParameters, contextJoins []*JoinData) (interface{}
   countRows, err := txn.Query("SELECT FOUND_ROWS()")
   if err != nil {
     txn.Rollback()
-    return nil, 0, ServerError("Could not retrieve " + pqp.ResourceName + ".", err)
+    return nil, 0, rest.ServerError("Could not retrieve " + pqp.ResourceName + ".", err)
   }
 
   var count int64
   if !countRows.Next() {
     countRows.Close()
     txn.Rollback()
-    return nil, 0, ServerError("Could not retrieve " + pqp.ResourceName + ".", err)
+    return nil, 0, rest.ServerError("Could not retrieve " + pqp.ResourceName + ".", err)
   }
   if err = countRows.Scan(&count); err != nil {
     countRows.Close()
     txn.Rollback()
-    return nil, 0, ServerError("Could not retrieve " + pqp.ResourceName + ".", err)
+    return nil, 0, rest.ServerError("Could not retrieve " + pqp.ResourceName + ".", err)
   }
   countRows.Close()
   txn.Commit()
