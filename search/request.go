@@ -12,6 +12,7 @@ import (
 
 type SearchFunc func(*rest.SearchParams, context.Context, []*JoinData) (interface{}, int64, rest.RestError)
 
+// TODO: this should probably move to the rest package, yeah?
 func ExtractSearchParamsFromUrl(w http.ResponseWriter, r *http.Request) (*rest.SearchParams, rest.RestError) {
   var sp rest.SearchParams
 
